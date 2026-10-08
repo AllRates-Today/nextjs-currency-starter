@@ -100,3 +100,7 @@ Responses carry `Cache-Control: s-maxage=300, stale-while-revalidate=300`, so a 
 ## 📄 License
 
 MIT — use it as the base for anything, commercial included. In keyless mode, keep a visible attribution link to [allratestoday.com](https://allratestoday.com) (the ECB endpoint's terms); with an API key, attribution is appreciated but not required.
+
+## 🔗 Links
+
+- **AI agents:** Claude Code plugin `/plugin marketplace add AllRates-Today/claude-code-plugin` · hosted MCP endpoint `https://allratestoday.com/api/mcp` (keyless)
