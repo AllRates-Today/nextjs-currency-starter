@@ -6,7 +6,7 @@ import { getCurrencies, getMode } from "@/lib/rates";
  *
  * Lists the currencies available in the current mode:
  *  - keyed ("live"): 160+ currencies from /v1/symbols
- *  - keyless ("ecb"): the ~31 currencies on the ECB daily reference-rate table
+ *  - keyless ("ecb"): EUR plus every currency on the live ECB daily table
  */
 export async function GET() {
   try {

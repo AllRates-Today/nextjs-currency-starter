@@ -76,15 +76,18 @@ GET /api/rate?from=USD&to=EUR
 {
   "from": "USD",
   "to": "EUR",
-  "rate": 0.8547739123,
-  "date": "2026-08-21",
+  "rate": 0.8922198429,
+  "date": "2026-10-15",
   "mode": "ecb",
   "derived": true,
+  "method": "inverse",
   "attribution": { "text": "ECB reference rates via AllRatesToday", "url": "https://allratestoday.com" }
 }
 ```
 
-Responses carry `Cache-Control: s-maxage=300, stale-while-revalidate=300`, so a CDN in front (Vercel included) shares the snapshot too. The in-memory cache is per server instance — for multi-region or serverless-heavy deployments, swap it for Redis/KV using the same `cached()` helper in `lib/rates.ts`.
+In keyless mode the server fetches the whole ECB table once (cached for 5 minutes) and computes any pair from its EUR rates: `method` is `direct` for EUR→X, `inverse` for X→EUR, and `cross` for pairs like USD→GBP computed via EUR. `date` is always `YYYY-MM-DD` — the ECB `rate_date` in keyless mode, the date of the live quote with a key.
+
+`/api/rate` responses carry `Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=300` and `/api/currencies` carries `public, max-age=300, s-maxage=3600`, so a CDN in front (Vercel included) shares the snapshot too. The in-memory cache is per server instance — for multi-region or serverless-heavy deployments, swap it for Redis/KV using the same `cached()` helper in `lib/rates.ts`.
 
 ## 🚢 Deploy
 

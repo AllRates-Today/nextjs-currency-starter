@@ -8,6 +8,8 @@ import { AllRatesToday } from "@allratestoday/sdk";
  *              currencies via @allratestoday/sdk. The key never leaves the server.
  *  - "ecb"   — no key: the open ECB endpoint (official European Central Bank
  *              daily reference rates, ~30 currencies, keyless, attribution required).
+ *              The full EUR-based table is fetched once and any pair is computed
+ *              from it (USD→GBP = EUR→GBP / EUR→USD, marked as a cross).
  *
  * Caching best practice: AllRatesToday recommends caching rates on your server
  * instead of calling the API on every page view — mid-market rates move
@@ -40,6 +42,8 @@ export interface RateResult {
   mode: RateMode;
   /** ECB mode only: true when the pair is computed from published EUR rates. */
   derived?: boolean;
+  /** ECB mode only: "direct" (EUR→X as published), "inverse" (X→EUR) or "cross" (via EUR). */
+  method?: "direct" | "inverse" | "cross";
   attribution: { text: string; url: string };
 }
 
@@ -66,14 +70,39 @@ const ECB_ATTRIBUTION = {
 
 const OPEN_ECB_URL = "https://allratestoday.com/api/open/central-bank/ecb";
 
-interface OpenEcbResponse {
+interface OpenEcbTable {
   bank?: string;
   rate_date?: string;
-  source?: string;
-  target?: string;
-  rate?: number;
-  derived?: boolean;
-  attribution?: { source?: string; url?: string };
+  rates?: { base: string; quote: string; value: number }[];
+}
+
+interface EcbTable {
+  date: string;
+  /** Units of each currency per 1 EUR, EUR itself included as 1. */
+  perEur: Map<string, number>;
+}
+
+/** The whole ECB table, cached, so every pair costs zero extra upstream calls. */
+async function getEcbTable(): Promise<EcbTable> {
+  return cached("ecb:table", async () => {
+    const res = await fetch(OPEN_ECB_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error(`ECB endpoint responded ${res.status}`);
+    const data = (await res.json()) as OpenEcbTable;
+    const perEur = new Map<string, number>([["EUR", 1]]);
+    for (const r of data.rates ?? []) {
+      if (r.base === "EUR" && typeof r.value === "number" && r.value > 0) {
+        perEur.set(r.quote, r.value);
+      }
+    }
+    if (perEur.size < 2) throw new Error("ECB endpoint returned an empty table");
+    return { date: data.rate_date ?? new Date().toISOString().slice(0, 10), perEur };
+  });
+}
+
+/** Normalise "2026-10-16T11:34:01+0000" (or a plain date) to YYYY-MM-DD. */
+function toIsoDate(value: string | undefined): string {
+  const m = value?.match(/^\d{4}-\d{2}-\d{2}/);
+  return m ? m[0] : new Date().toISOString().slice(0, 10);
 }
 
 const CODE_RE = /^[A-Z]{3}$/;
@@ -95,34 +124,38 @@ export async function getRate(from: string, to: string): Promise<RateResult> {
         from,
         to,
         rate,
-        date: res.date ?? new Date().toISOString().slice(0, 10),
+        date: toIsoDate(res.date),
         mode: "live" as const,
         attribution: LIVE_ATTRIBUTION,
       };
     }
 
-    const url = `${OPEN_ECB_URL}?source=${from}&target=${to}`;
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) {
-      throw new Error(`ECB endpoint responded ${res.status} for ${from}/${to}`);
-    }
-    const data = (await res.json()) as OpenEcbResponse;
-    if (typeof data.rate !== "number") {
+    const table = await getEcbTable();
+    const fromPerEur = table.perEur.get(from);
+    const toPerEur = table.perEur.get(to);
+    if (fromPerEur === undefined || toPerEur === undefined) {
       throw new Error(`No ECB rate available for ${from}/${to}`);
     }
+    const method =
+      from === "EUR" ? "direct" : to === "EUR" ? "inverse" : "cross";
     return {
       from,
       to,
-      rate: data.rate,
-      date: data.rate_date ?? new Date().toISOString().slice(0, 10),
+      rate: toPerEur / fromPerEur,
+      date: table.date,
       mode: "ecb" as const,
-      derived: data.derived,
+      derived: method !== "direct",
+      method,
       attribution: ECB_ATTRIBUTION,
     };
   });
 }
 
-/** The ~31 currencies on the ECB's daily reference-rate table (keyless mode). */
+/**
+ * Display names for currencies the ECB publishes (or has published). Keyless
+ * mode lists only the codes present in the live table, so a currency the ECB
+ * drops disappears automatically; a new code falls back to Intl names.
+ */
 const ECB_CURRENCIES: Currency[] = [
   { code: "EUR", name: "Euro" },
   { code: "USD", name: "US Dollar" },
@@ -143,7 +176,6 @@ const ECB_CURRENCIES: Currency[] = [
   { code: "CZK", name: "Czech Koruna" },
   { code: "HUF", name: "Hungarian Forint" },
   { code: "RON", name: "Romanian Leu" },
-  { code: "BGN", name: "Bulgarian Lev" },
   { code: "TRY", name: "Turkish Lira" },
   { code: "ILS", name: "Israeli Shekel" },
   { code: "INR", name: "Indian Rupee" },
@@ -157,8 +189,29 @@ const ECB_CURRENCIES: Currency[] = [
   { code: "ZAR", name: "South African Rand" },
 ];
 
+const ECB_NAMES = new Map(ECB_CURRENCIES.map((c) => [c.code, c.name]));
+
+function currencyName(code: string): string {
+  const known = ECB_NAMES.get(code);
+  if (known) return known;
+  try {
+    return new Intl.DisplayNames(["en"], { type: "currency" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** Keyless list: EUR plus every quote on the live ECB table. */
+async function getEcbCurrencies(): Promise<Currency[]> {
+  const table = await getEcbTable();
+  return [...table.perEur.keys()]
+    .filter(isValidCode)
+    .map((code) => ({ code, name: currencyName(code) }))
+    .sort((a, b) => (a.code === "EUR" ? -1 : b.code === "EUR" ? 1 : a.code.localeCompare(b.code)));
+}
+
 export async function getCurrencies(): Promise<Currency[]> {
-  if (!apiKey) return ECB_CURRENCIES;
+  if (!apiKey) return getEcbCurrencies();
 
   return cached("currencies:live", async () => {
     const fx = new AllRatesToday({ apiKey });

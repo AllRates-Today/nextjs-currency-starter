@@ -14,6 +14,7 @@ interface RateResult {
   date: string;
   mode: "live" | "ecb";
   derived?: boolean;
+  method?: "direct" | "inverse" | "cross";
   attribution: { text: string; url: string };
 }
 
@@ -207,7 +208,13 @@ export default function Converter() {
               </div>
               <div className="result-date">
                 {result.mode === "ecb"
-                  ? `ECB reference rate for ${result.date}${result.derived ? " (derived pair)" : ""}`
+                  ? `ECB reference rate for ${result.date}${
+                      result.method === "cross"
+                        ? " (cross rate via EUR)"
+                        : result.derived
+                          ? " (derived pair)"
+                          : ""
+                    }`
                   : `Real-time mid-market rate, ${result.date}`}
               </div>
             </>
