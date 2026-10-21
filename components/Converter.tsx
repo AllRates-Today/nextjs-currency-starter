@@ -226,13 +226,12 @@ export default function Converter() {
         </div>
 
         <p className="attribution">
-          Powered by{" "}
           <a
             href={result?.attribution.url ?? "https://allratestoday.com"}
             target="_blank"
             rel="noopener noreferrer"
           >
-            AllRatesToday
+            Exchange rates by AllRatesToday
           </a>
         </p>
       </div>
