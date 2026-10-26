@@ -112,4 +112,5 @@ MIT — use it as the base for anything, commercial included. In keyless mode, k
 - **Register (Free):** [allratestoday.com/register](https://allratestoday.com/register)
 - **Dashboard:** [allratestoday.com/profile](https://allratestoday.com/profile)
 - **Status:** [allratestoday.com/status](https://allratestoday.com/status)
+- **Postman:** [allratestoday.com/postman](https://allratestoday.com/postman/)
 - **GitHub:** [github.com/AllRates-Today/nextjs-currency-starter](https://github.com/AllRates-Today/nextjs-currency-starter)
