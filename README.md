@@ -97,7 +97,7 @@ In keyless mode the server fetches the whole ECB table once (cached for 5 minute
 
 - [API documentation](https://allratestoday.com/docs/) — every endpoint, all output formats
 - [For AI agents](https://allratestoday.com/for-ai-agents/) — MCP server, machine-readable docs, agent-friendly auth
-- [Central bank rates API](https://allratestoday.com/central-bank-rates-api/) — official tables from 121 central banks and 3 tax authorities, the compliance-grade counterpart to mid-market
+- [Central bank rates API](https://allratestoday.com/central-bank-rates-api/) — official tables from 130+ central banks and tax authorities, the compliance-grade counterpart to mid-market
 - [`@allratestoday/sdk`](https://www.npmjs.com/package/@allratestoday/sdk) — the zero-dependency SDK this starter uses
 
 ## 📄 License
